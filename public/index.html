@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo List</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .todo-container { max-width: 600px; margin: 20px auto; }
+    .todo-item { display: flex; justify-content: space-between; padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; }
+    .todo-item.completed { text-decoration: line-through; color: grey; }
+    .form-group { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="todo-container">
+  <h1>Todo List</h1>
+
+  <!-- Form to create a new todo -->
+  <form id="todo-form">
+    <div class="form-group">
+      <input type="text" id="todo-name" placeholder="Todo Name" required>
+    </div>
+    <div class="form-group">
+      <input type="text" id="todo-desc" placeholder="Todo Description" required>
+    </div>
+    <div class="form-group">
+      <input type="number" id="todo-days" placeholder="Days" required>
+    </div>
+    <button type="submit">Add Todo</button>
+  </form>
+
+
+  <form id="todo-update-form" style="display: none;">
+    <div class="form-group">
+      <input type="text" id="update-todo-name" placeholder="Todo Name" required>
+    </div>
+    <div class="form-group">
+      <input type="text" id="update-todo-desc" placeholder="Todo Description" required>
+    </div>
+    <div class="form-group">
+      <input type="number" id="update-todo-days" placeholder="Days" required>
+    </div>
+    <button type="submit">Update Todo</button>
+    <button type="button" onclick="cancelUpdate()">Cancel</button>
+  </form>
+
+  <h2>Todo Items</h2>
+  <div id="todo-list"></div>
+</div>
+
+<script>
+  const form = document.getElementById('todo-form');
+  const updateForm = document.getElementById('todo-update-form');
+  const todoList = document.getElementById('todo-list');
+
+  let editingTodoId = null;
+
+  // Fetch all todos from the backend
+  async function fetchTodos() {
+    const response = await fetch('/todos');
+    const todos = await response.json();
+    displayTodos(todos);
+  }
+
+  // Display all todos in the DOM
+  function displayTodos(todos) {
+    todoList.innerHTML = '';
+    todos.forEach(todo => {
+      const todoItem = document.createElement('div');
+      todoItem.classList.add('todo-item');
+      if (todo.isDone) {
+        todoItem.classList.add('completed');
+      }
+
+      todoItem.innerHTML = `
+        <span>${todo.name}: ${todo.desc} (${todo.days} days)</span>
+        <div>
+          <button onclick="toggleTodo('${todo._id}', ${todo.isDone})">
+            ${todo.isDone ? 'Undo' : 'Complete'}
+          </button>
+          <button onclick="editTodo('${todo._id}', '${todo.name}', '${todo.desc}', ${todo.days})">Edit</button>
+          <button onclick="deleteTodo('${todo._id}')">Delete</button>
+        </div>
+      `;
+
+      todoList.appendChild(todoItem);
+    });
+  }
+
+  // Handle form submission for adding a new todo
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('todo-name').value;
+    const desc = document.getElementById('todo-desc').value;
+    const days = document.getElementById('todo-days').value;
+
+    const response = await fetch('/todo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, desc, days, isDone: false })
+    });
+
+    if (response.ok) {
+      form.reset();
+      fetchTodos(); // Refresh the list after adding
+    }
+  });
+
+  // Edit a todo
+  function editTodo(id, name, desc, days) {
+    editingTodoId = id;
+    document.getElementById('update-todo-name').value = name;
+    document.getElementById('update-todo-desc').value = desc;
+    document.getElementById('update-todo-days').value = days;
+
+    form.style.display = 'none'; 
+    updateForm.style.display = 'block'; 
+  }
+
+  // Handle form submission for updating an existing todo
+  updateForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('update-todo-name').value;
+    const desc = document.getElementById('update-todo-desc').value;
+    const days = document.getElementById('update-todo-days').value;
+
+    const response = await fetch(`/todo/${editingTodoId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, desc, days })
+    });
+
+    if (response.ok) {
+      updateForm.reset();
+      fetchTodos(); 
+      cancelUpdate();
+    }
+  });
+
+ 
+  function cancelUpdate() {
+    updateForm.style.display = 'none'; 
+    form.style.display = 'block'; 
+  }
+
+  // Toggle todo completion
+  async function toggleTodo(id, isDone) {
+    const response = await fetch(`/todo/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isDone: !isDone })
+    });
+    if (response.ok) {
+      fetchTodos(); 
+    }
+  }
+
+  // Delete a todo
+  async function deleteTodo(id) {
+    const response = await fetch(`/todo/${id}`, { method: 'DELETE' });
+    if (response.ok) {
+      fetchTodos();
+    }
+  }
+
+  // Fetch todos when the page loads
+  fetchTodos();
+</script>
+
+</body>
+</html>
